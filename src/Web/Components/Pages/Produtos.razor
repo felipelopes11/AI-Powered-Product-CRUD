@@ -1,0 +1,150 @@
+@page "/produtos"
+@rendermode InteractiveServer
+
+@inject ProdutoService ProdutoService
+
+<PageTitle>Gerenciar Produtos</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Gerenciar Produtos</h1>
+    <button class="btn btn-primary btn-lg" @onclick="PrepararParaAdicionar">
+        <span class="bi bi-plus-circle-fill me-2" aria-hidden="true"></span>
+        Novo Produto
+    </button>
+</div>
+
+<div class="row">
+    <div class="col-md-7">
+        @if (produtos is null)
+        {
+            <div class="text-center">
+                <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                </div>
+            </div>
+        }
+        else
+        {
+            <table class="table table-hover table-dark align-middle">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Preço</th>
+                        <th>Estoque</th>
+                        <th class="text-center">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var produto in produtos)
+                    {
+                        <tr>
+                            <td>@produto.Nome</td>
+                            <td>@produto.Preco.ToString("C")</td>
+                            <td>@produto.Estoque</td>
+                            <td class="text-center">
+                                <button class="btn btn-sm btn-primary me-2" @onclick="() => PrepararParaEditar(produto)"><span class="bi bi-pencil-square"></span> Editar</button>
+                                <button class="btn btn-sm btn-danger" @onclick="() => Remover(produto.Id)"><span class="bi bi-trash3-fill"></span> Excluir</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+
+    <div class="col-md-5">
+        @if(exibirFormulario)
+        {
+            <div class="card bg-dark">
+                <div class="card-body">
+                    <h3 class="card-title mb-4">@tituloFormulario</h3>
+                    <EditForm Model="ProdutoAtual" OnValidSubmit="Salvar">
+                        <DataAnnotationsValidator />
+                        <div class="mb-3">
+                            <label class="form-label">Nome</label>
+                            <InputText class="form-control" @bind-Value="ProdutoAtual.Nome" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Preço</label>
+                            <InputNumber class="form-control" @bind-Value="ProdutoAtual.Preco" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Estoque</label>
+                            <InputNumber class="form-control" @bind-Value="ProdutoAtual.Estoque" />
+                        </div>
+                        <div class="d-grid gap-2">
+                           <button type="submit" class="btn btn-success">Salvar Alterações</button>
+                           <button type="button" class="btn btn-secondary" @onclick="Cancelar">Cancelar</button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<Produto>? produtos;
+    private bool exibirFormulario = false;
+    private string tituloFormulario = "";
+
+    private Produto ProdutoAtual { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CarregarProdutos();
+    }
+
+    private async Task CarregarProdutos()
+    {
+        produtos = await ProdutoService.ObterTodosProdutos();
+    }
+    
+    private void PrepararParaAdicionar()
+    {
+        ProdutoAtual = new();
+        tituloFormulario = "Adicionar Novo Produto";
+        exibirFormulario = true;
+    }
+
+    private void PrepararParaEditar(Produto produto)
+    {
+        ProdutoAtual = new Produto
+        {
+            Id = produto.Id,
+            Nome = produto.Nome,
+            Preco = produto.Preco,
+            Estoque = produto.Estoque
+        };
+        tituloFormulario = $"Editando: {produto.Nome}";
+        exibirFormulario = true;
+    }
+    
+    private async Task Salvar()
+    {
+        if (ProdutoAtual.Id == 0)
+        {
+            await ProdutoService.AdicionarProduto(ProdutoAtual);
+        }
+        else
+        {
+            await ProdutoService.AtualizarProduto(ProdutoAtual);
+        }
+
+        await CarregarProdutos();
+        await Task.Delay(1); 
+        exibirFormulario = false;
+    }
+
+    private async Task Remover(int id)
+    {
+        await ProdutoService.RemoverProduto(id);
+        await CarregarProdutos();
+        exibirFormulario = false;
+    }
+
+    private void Cancelar()
+    {
+        exibirFormulario = false;
+    }
+}

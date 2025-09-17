@@ -1,0 +1,49 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:CadastroProdutosAI.UI.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="500"
+        x:Class="CadastroProdutosAI.UI.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="Cadastro de Produtos">
+
+  <Grid ColumnDefinitions="*, Auto, 300" Margin="15">
+
+    <DataGrid Grid.Column="0"
+              ItemsSource="{Binding Produtos}"
+              SelectedItem="{Binding ProdutoSelecionado}"
+              IsReadOnly="True"
+              AutoGenerateColumns="False">
+      <DataGrid.Columns>
+        <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="50"/>
+        <DataGridTextColumn Header="Nome" Binding="{Binding Nome}" Width="*"/>
+        <DataGridTextColumn Header="Preço" Binding="{Binding Preco, StringFormat='R$ {0:F2}'}" Width="100"/>
+        <DataGridTextColumn Header="Estoque" Binding="{Binding Estoque}" Width="80"/>
+      </DataGrid.Columns>
+    </DataGrid>
+
+    <Border Grid.Column="1" Background="LightGray" Width="1" Margin="10,0"/>
+
+    <StackPanel Grid.Column="2" Spacing="10">
+      <TextBlock Text="Gerenciar Produto" FontSize="18" FontWeight="Bold"/>
+
+      <TextBlock Text="Nome:"/>
+      <TextBox Text="{Binding NomeProduto}"/>
+
+      <TextBlock Text="Preço:"/>
+      <TextBox Text="{Binding PrecoProduto}"/>
+
+      <TextBlock Text="Estoque:"/>
+      <TextBox Text="{Binding EstoqueProduto}"/>
+      
+      <Grid ColumnDefinitions="*,*,*" Margin="0,20,0,0" ColumnSpacing="10">
+        <Button Grid.Column="0" Content="Adicionar" Command="{Binding AdicionarProdutoCommand}" HorizontalAlignment="Stretch" Background="ForestGreen"/>
+        <Button Grid.Column="1" Content="Atualizar" Command="{Binding AtualizarProdutoCommand}" HorizontalAlignment="Stretch" Background="RoyalBlue"/>
+        <Button Grid.Column="2" Content="Remover" Command="{Binding RemoverProdutoCommand}" HorizontalAlignment="Stretch" Background="Crimson"/>
+      </Grid>
+    </StackPanel>
+
+  </Grid>
+</Window>

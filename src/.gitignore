@@ -1,0 +1,13 @@
+# Pastas e arquivos de compilação do .NET
+**/bin
+**/obj
+.vs/
+*.user
+*.suo
+
+# Arquivo de configuração de desenvolvimento que contém segredos
+# ESTA LINHA É A MAIS IMPORTANTE PARA A SUA SEGURANÇA
+src/Web/appsettings.Development.json
+
+# Arquivos de IDEs
+.idea/

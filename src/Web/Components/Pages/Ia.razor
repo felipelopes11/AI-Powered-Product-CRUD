@@ -1,0 +1,188 @@
+@page "/ia"
+@rendermode InteractiveServer
+
+@using System.Text.Json
+@inject ChatAiService ChatAiService
+@inject ProdutoService ProdutoService
+
+<PageTitle>Assistente IA</PageTitle>
+
+<div class="ia-page-container">
+    
+    <div class="chat-history">
+        <div class="chat-bubble chat-bubble-assistant">
+            Olá! Sou seu assistente de produtos. Como posso ajudar hoje? Diga algo como "liste os produtos".
+        </div>
+
+        @foreach (var msg in mensagens)
+        {
+            <div class="chat-bubble @msg.CssClass">
+                @((MarkupString)msg.Conteudo)
+            </div>
+        }
+
+        @if (carregando)
+        {
+            <div class="chat-bubble chat-bubble-assistant">
+                <div class="spinner-grow spinner-grow-sm" role="status">
+                    <span class="visually-hidden">Pensando...</span>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="chat-input-row">
+        <div class="input-group">
+            <input @bind="mensagemAtual" @bind:event="oninput" @onkeydown="HandleKeyDown" class="form-control" placeholder="Digite seu comando..." disabled="@carregando" />
+            <button class="btn btn-primary" @onclick="EnviarMensagem" disabled="@(carregando || string.IsNullOrWhiteSpace(mensagemAtual))">
+                <span class="bi bi-send-fill"></span>
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<MensagemChat> mensagens = new();
+    private string mensagemAtual = "";
+    private bool carregando = false;
+
+    private async Task EnviarMensagem()
+    {
+        if (string.IsNullOrWhiteSpace(mensagemAtual) || carregando) return;
+
+        var comando = mensagemAtual;
+        mensagens.Add(new MensagemChat(comando, "user"));
+        mensagemAtual = "";
+        carregando = true;
+
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            var respostaJson = await ChatAiService.ExecutarComando(comando);
+            var funcao = respostaJson.GetProperty("funcao").GetString();
+            var parametros = respostaJson.GetProperty("parametros");
+
+            string respostaAssistente = await ProcessarFuncao(funcao, parametros);
+            mensagens.Add(new MensagemChat(respostaAssistente, "assistant"));
+        }
+        catch (Exception ex)
+        {
+            mensagens.Add(new MensagemChat($"Ocorreu um erro: {ex.Message}", "assistant"));
+        }
+        finally
+        {
+            carregando = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task<string> ProcessarFuncao(string? funcao, JsonElement parametros)
+    {
+        switch (funcao?.ToLower())
+        {
+            case "listar_produtos":
+                var produtos = await ProdutoService.ObterTodosProdutos();
+                if (!produtos.Any()) return "Nenhum produto encontrado no cadastro.";
+                var listaHtml = "<strong>Produtos encontrados:</strong><ul>";
+                foreach (var p in produtos)
+                {
+                    listaHtml += $"<li>ID {p.Id}: {p.Nome} - {p.Preco:C} (Estoque: {p.Estoque})</li>";
+                }
+                listaHtml += "</ul>";
+                return listaHtml;
+
+            case "adicionar_produto":
+                var novoProduto = new Produto
+                {
+                    Nome = parametros.GetProperty("nome").GetString() ?? "Sem Nome",
+                    Preco = parametros.GetProperty("preco").GetDecimal(),
+                    Estoque = parametros.GetProperty("estoque").GetInt32()
+                };
+                await ProdutoService.AdicionarProduto(novoProduto);
+                return $"Produto '{novoProduto.Nome}' adicionado com sucesso!";
+
+            case "atualizar_produto":
+                var todosOsProdutos = await ProdutoService.ObterTodosProdutos();
+                Produto? produtoParaAtualizar = null;
+
+                if (parametros.TryGetProperty("id", out var idJson))
+                {
+                    produtoParaAtualizar = todosOsProdutos.FirstOrDefault(p => p.Id == idJson.GetInt32());
+                }
+                else if (parametros.TryGetProperty("nome", out var nomeJson))
+                {
+                    produtoParaAtualizar = todosOsProdutos.FirstOrDefault(p => p.Nome.Equals(nomeJson.GetString(), StringComparison.OrdinalIgnoreCase));
+                }
+
+                if (produtoParaAtualizar == null)
+                {
+                    return "Não encontrei o produto que você pediu para atualizar. Por favor, especifique o nome ou ID correto.";
+                }
+                
+                if (parametros.TryGetProperty("nome", out var novoNomeJson))
+                {
+                    produtoParaAtualizar.Nome = novoNomeJson.GetString() ?? produtoParaAtualizar.Nome;
+                }
+                if (parametros.TryGetProperty("preco", out var novoPrecoJson))
+                {
+                    produtoParaAtualizar.Preco = novoPrecoJson.GetDecimal();
+                }
+                if (parametros.TryGetProperty("estoque", out var novoEstoqueJson))
+                {
+                    produtoParaAtualizar.Estoque = novoEstoqueJson.GetInt32();
+                }
+
+                await ProdutoService.AtualizarProduto(produtoParaAtualizar);
+                return $"Produto '{produtoParaAtualizar.Nome}' (ID: {produtoParaAtualizar.Id}) atualizado com sucesso!";
+
+            case "remover_produto":
+                var idParaRemover = parametros.GetProperty("id").GetInt32();
+                await ProdutoService.RemoverProduto(idParaRemover);
+                return $"Produto com ID {idParaRemover} removido com sucesso.";
+                
+            case "consultar_produto":
+                var todosProdutosConsulta = await ProdutoService.ObterTodosProdutos();
+                Produto? produtoEncontrado = null;
+
+                if (parametros.TryGetProperty("id", out var idConsultaJson))
+                {
+                    produtoEncontrado = todosProdutosConsulta.FirstOrDefault(p => p.Id == idConsultaJson.GetInt32());
+                }
+                else if (parametros.TryGetProperty("nome", out var nomeConsultaJson))
+                {
+                    produtoEncontrado = todosProdutosConsulta.FirstOrDefault(p => p.Nome.Equals(nomeConsultaJson.GetString(), StringComparison.OrdinalIgnoreCase));
+                }
+
+                if (produtoEncontrado != null)
+                {
+                    return $"Detalhes de '{produtoEncontrado.Nome}': <br/>" +
+                           $"- Preço: {produtoEncontrado.Preco:C} <br/>" +
+                           $"- Estoque: {produtoEncontrado.Estoque} unidades.";
+                }
+                return $"Desculpe, não encontrei o produto especificado.";
+
+            case "conversa_simples":
+                return parametros.GetProperty("resposta").GetString() ?? "Olá! Como posso ajudar?";
+            
+            case "erro":
+                return parametros.GetProperty("mensagem").GetString() ?? "Não entendi o comando.";
+
+            default:
+                return "Função desconhecida recebida da IA.";
+        }
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await EnviarMensagem();
+        }
+    }
+
+    record MensagemChat(string Conteudo, string Papel)
+    {
+        public string CssClass => Papel == "user" ? "chat-bubble-user" : "chat-bubble-assistant";
+    }
+}
